@@ -59,3 +59,20 @@ export const logoutController = catchAsync(async (req: Request, res: Response) =
     message: "Logged out successfully",
   });
 });
+
+
+export const exchangeController = catchAsync(async (req: Request, res: Response) => {
+  const { code } = req.body;
+  if (!code) throw new ApiError(400, "Code is required");
+
+  // refreshToken cookie must also be present — attacker with only the code is blocked
+  const refreshToken = req.cookies?.refreshToken;
+  if (!refreshToken) throw new ApiError(401, "No refresh token");
+
+  const result = await authService.exchangeOAuthCode(code, refreshToken);
+
+  res.status(200).json({
+    success: true,
+    data: { user: result.user, accessToken: result.accessToken },
+  });
+});

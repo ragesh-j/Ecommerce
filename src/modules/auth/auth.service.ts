@@ -90,3 +90,25 @@ export const refresh = async (refreshToken: string) => {
 export const logout = async (refreshToken: string) => {
   await prisma.session.deleteMany({ where: { refreshToken } });
 };
+
+
+// ─── exchange oauth code for accessToken ─────────────────────────────────────
+export const exchangeOAuthCode = async (code: string, refreshToken: string) => {
+  // code is the session.id from the URL
+  const session = await prisma.session.findUnique({
+    where: { id: code },
+    include: { user: true },
+  });
+
+  if (!session) throw new ApiError(400, "Invalid code");
+  if (session.accessTokenExpiry < new Date()) throw new ApiError(400, "Code expired");
+
+  // must match the refreshToken cookie — blocks attacker who only has the code
+  if (session.refreshToken !== refreshToken) throw new ApiError(400, "Invalid code");
+
+  const { user } = session;
+  return {
+    user: { id: user.id, name: user.name, email: user.email, role: user.role },
+    accessToken: session.accessToken,
+  };
+};
