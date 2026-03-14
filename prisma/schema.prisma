@@ -1,0 +1,250 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id            String         @id @default(cuid())
+  email         String         @unique
+  emailVerified DateTime?
+  passwordHash  String?
+  name          String?
+  avatarUrl     String?
+  role          Role           @default(BUYER)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  accounts      Account[]
+  addresses     Address[]
+  media         Media[]
+  orders        Order[]
+  payments      Payment[]
+  reviews       Review[]
+  sellerProfile SellerProfile?
+  sessions      Session[]
+
+  @@index([email])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  provider          String
+  providerAccountId String
+  accessToken       String?
+  refreshToken      String?
+  expiresAt         Int?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id                 String   @id @default(cuid())
+  userId             String
+  accessToken        String   @unique
+  refreshToken       String   @unique
+  accessTokenExpiry  DateTime
+  refreshTokenExpiry DateTime
+  createdAt          DateTime @default(now())
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model SellerProfile {
+  id          String    @id @default(cuid())
+  userId      String    @unique
+  storeName   String
+  description String?
+  logoUrl     String?
+  isVerified  Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  payouts     Payout[]
+  products    Product[]
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Category {
+  id       String     @id @default(cuid())
+  name     String     @unique
+  slug     String     @unique
+  parentId String?
+  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryTree")
+  products Product[]
+}
+
+model Product {
+  id          String           @id @default(cuid())
+  sellerId    String
+  categoryId  String
+  name        String
+  slug        String           @unique
+  description String?
+  isPublished Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  media       Media[]
+  category    Category         @relation(fields: [categoryId], references: [id])
+  seller      SellerProfile    @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  variants    ProductVariant[]
+  reviews     Review[]
+
+  @@index([sellerId])
+  @@index([categoryId])
+  @@index([slug])
+}
+
+model ProductVariant {
+  id         String      @id @default(cuid())
+  productId  String
+  sku        String      @unique
+  name       String
+  price      Decimal     @db.Decimal(10, 2)
+  stock      Int         @default(0)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  orderItems OrderItem[]
+  product    Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+}
+
+model Media {
+  id         String    @id @default(cuid())
+  uploaderId String
+  productId  String?
+  type       MediaType
+  url        String
+  key        String    @unique
+  mimeType   String
+  size       Int
+  createdAt  DateTime  @default(now())
+  product    Product?  @relation(fields: [productId], references: [id])
+  uploader   User      @relation(fields: [uploaderId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+}
+
+model Address {
+  id         String  @id @default(cuid())
+  userId     String
+  line1      String
+  line2      String?
+  city       String
+  state      String?
+  postalCode String
+  country    String
+  isDefault  Boolean @default(false)
+  user       User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders     Order[]
+
+  @@index([userId])
+}
+
+model Order {
+  id          String      @id @default(cuid())
+  userId      String
+  addressId   String
+  status      OrderStatus @default(PENDING)
+  totalAmount Decimal     @db.Decimal(10, 2)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  address     Address     @relation(fields: [addressId], references: [id])
+  user        User        @relation(fields: [userId], references: [id])
+  items       OrderItem[]
+  payment     Payment?
+
+  @@index([userId])
+}
+
+model OrderItem {
+  id        String         @id @default(cuid())
+  orderId   String
+  variantId String
+  quantity  Int
+  unitPrice Decimal        @db.Decimal(10, 2)
+  order     Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  variant   ProductVariant @relation(fields: [variantId], references: [id])
+
+  @@index([orderId])
+}
+
+model Payment {
+  id               String        @id @default(cuid())
+  orderId          String        @unique
+  userId           String
+  amount           Decimal       @db.Decimal(10, 2)
+  currency         String        @default("usd")
+  status           PaymentStatus @default(PENDING)
+  provider         String
+  providerTxId     String?       @unique
+  providerMetadata Json?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  order            Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user             User          @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+model Payout {
+  id           String        @id @default(cuid())
+  sellerId     String
+  amount       Decimal       @db.Decimal(10, 2)
+  currency     String        @default("usd")
+  status       PaymentStatus @default(PENDING)
+  providerTxId String?       @unique
+  createdAt    DateTime      @default(now())
+  seller       SellerProfile @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+
+  @@index([sellerId])
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  productId String
+  userId    String
+  rating    Int
+  body      String?
+  createdAt DateTime @default(now())
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([productId, userId])
+  @@index([productId])
+}
+
+enum Role {
+  BUYER
+  SELLER
+  ADMIN
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+  DOCUMENT
+}
