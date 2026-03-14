@@ -10,6 +10,7 @@ import notFound from './middlewares/notFound';
 import './modules/auth/google.strategy'; // ← registers the strategy
 
 import authRoutes from './modules/auth/auth.routes';
+import userRoutes from './modules/user/user.routes';
 
 const app = express();
 
@@ -38,7 +39,7 @@ app.get('/health', (req, res) => {
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
 app.use('/api/v1/auth', authRoutes);
-
+app.use('/api/v1/users',userRoutes);
 // ─── Error Handling ───────────────────────────────────────────────────────────
 app.use(notFound);
 app.use(errorHandler);
