@@ -11,6 +11,7 @@ import './modules/auth/google.strategy'; // ← registers the strategy
 
 import authRoutes from './modules/auth/auth.routes';
 import userRoutes from './modules/user/user.routes';
+import sellerRoutes from './modules/seller/seller.routes';
 
 const app = express();
 
@@ -40,6 +41,7 @@ app.get('/health', (req, res) => {
 // ─── Routes ───────────────────────────────────────────────────────────────────
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/users',userRoutes);
+app.use('/api/v1/sellers', sellerRoutes);
 // ─── Error Handling ───────────────────────────────────────────────────────────
 app.use(notFound);
 app.use(errorHandler);
