@@ -1,16 +1,18 @@
 import request from "supertest";
 import prisma from "../../src/config/db";
 import app from "../../src/app";
-import path from "path";
-import fs from "fs";
+
 
 // ─── mock R2 uploads ──────────────────────────────────────────────────────────
 jest.mock("../../src/utils/upload", () => ({
-  upload: { single: () => (_req: any, _res: any, next: any) => next() },
+  upload: {
+    single: () => (_req: any, _res: any, next: any) => next(),
+    array: () => (_req: any, _res: any, next: any) => next(), // ← add this
+  },
   uploadToR2: jest.fn().mockImplementation(() =>
     Promise.resolve({
       url: "https://r2.example.com/logos/test.jpg",
-      key: `logos/test-${Date.now()}.jpg`, // unique key each time
+      key: `logos/test-${Date.now()}-${Math.random()}.jpg`,
     })
   ),
   deleteFromR2: jest.fn().mockResolvedValue(undefined),
