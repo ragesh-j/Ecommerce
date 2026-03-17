@@ -16,6 +16,7 @@ import categoryRoutes from './modules/category/category.routes';
 import productRoutes from './modules/product/product.routes';
 import cartRoutes from './modules/cart/cart.routes';
 import orderRoutes from './modules/order/order.routes';
+import paymentRoutes from './modules/payment/payment.routes';
 
 const app = express();
 
@@ -29,6 +30,8 @@ app.use(cors({
 // ─── Logging ──────────────────────────────────────────────────────────────────
 app.use(morgan('dev'));
 
+// ─── Payment routes BEFORE express.json (webhook needs raw body) ──────────────
+app.use('/api/v1/payments', paymentRoutes);
 // ─── Body Parsing ─────────────────────────────────────────────────────────────
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
