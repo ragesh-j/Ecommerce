@@ -15,6 +15,7 @@ import sellerRoutes from './modules/seller/seller.routes';
 import categoryRoutes from './modules/category/category.routes';
 import productRoutes from './modules/product/product.routes';
 import cartRoutes from './modules/cart/cart.routes';
+import orderRoutes from './modules/order/order.routes';
 
 const app = express();
 
@@ -48,6 +49,7 @@ app.use('/api/v1/sellers', sellerRoutes);
 app.use('/api/v1/categories', categoryRoutes);
 app.use('/api/v1/products', productRoutes);
 app.use('/api/v1/cart', cartRoutes);
+app.use('/api/v1/orders', orderRoutes);
 // ─── Error Handling ───────────────────────────────────────────────────────────
 app.use(notFound);
 app.use(errorHandler);
