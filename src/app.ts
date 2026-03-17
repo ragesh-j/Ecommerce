@@ -14,6 +14,7 @@ import userRoutes from './modules/user/user.routes';
 import sellerRoutes from './modules/seller/seller.routes';
 import categoryRoutes from './modules/category/category.routes';
 import productRoutes from './modules/product/product.routes';
+import cartRoutes from './modules/cart/cart.routes';
 
 const app = express();
 
@@ -46,6 +47,7 @@ app.use('/api/v1/users',userRoutes);
 app.use('/api/v1/sellers', sellerRoutes);
 app.use('/api/v1/categories', categoryRoutes);
 app.use('/api/v1/products', productRoutes);
+app.use('/api/v1/cart', cartRoutes);
 // ─── Error Handling ───────────────────────────────────────────────────────────
 app.use(notFound);
 app.use(errorHandler);
