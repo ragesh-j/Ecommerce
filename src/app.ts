@@ -17,7 +17,7 @@ import productRoutes from './modules/product/product.routes';
 import cartRoutes from './modules/cart/cart.routes';
 import orderRoutes from './modules/order/order.routes';
 import paymentRoutes from './modules/payment/payment.routes';
-
+import reviewRoutes from './modules/review/review.routes';
 const app = express();
 
 // ─── Security ─────────────────────────────────────────────────────────────────
@@ -53,6 +53,7 @@ app.use('/api/v1/categories', categoryRoutes);
 app.use('/api/v1/products', productRoutes);
 app.use('/api/v1/cart', cartRoutes);
 app.use('/api/v1/orders', orderRoutes);
+app.use('/api/v1/reviews', reviewRoutes);
 // ─── Error Handling ───────────────────────────────────────────────────────────
 app.use(notFound);
 app.use(errorHandler);
