@@ -8,6 +8,7 @@ import {
   logoutController,
   exchangeController
 } from "./auth.controller";
+import { authLimiter } from "../../config/rateLimiter";
 
 const router = Router();
 const REFRESH_COOKIE_OPTIONS = {
@@ -16,8 +17,9 @@ const REFRESH_COOKIE_OPTIONS = {
   sameSite: "strict" as const,
   maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
 };
-router.post("/register", registerController);
-router.post("/login", loginController);
+
+router.post("/register", authLimiter, registerController);
+router.post("/login", authLimiter, loginController);
 router.post("/refresh", refreshController);
 router.post("/logout", logoutController);
 
