@@ -7,11 +7,10 @@ import { registerSchema, loginSchema,sellerRegisterSchema } from "./auth.validat
 
 const REFRESH_COOKIE_OPTIONS = {
   httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: "strict" as const,
-  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  secure: true, // ← always true in production
+  sameSite: "none" as const, // ← change from "strict" to "none" for cross-origin
+  maxAge: 7 * 24 * 60 * 60 * 1000,
 };
-
 export const registerController = catchAsync(async (req: Request, res: Response) => {
   const data = registerSchema.parse(req.body);
   const result = await authService.register(data);

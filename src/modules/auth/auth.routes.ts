@@ -14,9 +14,9 @@ import { authLimiter } from "../../config/rateLimiter";
 const router = Router();
 const REFRESH_COOKIE_OPTIONS = {
   httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: "strict" as const,
-  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  secure: true, // ← always true in production
+  sameSite: "none" as const, // ← change from "strict" to "none" for cross-origin
+  maxAge: 7 * 24 * 60 * 60 * 1000,
 };
 
 router.post("/register", authLimiter, registerController);
