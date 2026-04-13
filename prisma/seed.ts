@@ -5,7 +5,10 @@ import * as dotenv from "dotenv";
 
 dotenv.config();
 
-const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
+const adapter = new PrismaPg({ 
+  connectionString: process.env.DATABASE_URL!,
+  ssl: { rejectUnauthorized: false } // ← add this
+});
 const prisma = new PrismaClient({ adapter });
 
 async function main() {

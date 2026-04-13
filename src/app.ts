@@ -28,6 +28,7 @@ const app = express();
 // ─── Security ─────────────────────────────────────────────────────────────────
 app.use(helmet());
 app.use(compression()); 
+app.set('trust proxy', 1);
 app.use(cors({
     origin: [
     process.env.FRONTEND_URL!,        // customer app
@@ -36,9 +37,7 @@ app.use(cors({
   ],
   credentials: true,
 }));
-if (process.env.NODE_ENV === 'production') {
-  app.set('trust proxy', 1);
-}
+
 app.use(generalLimiter); // ← apply to all routes
 
 // ─── Logging ──────────────────────────────────────────────────────────────────
