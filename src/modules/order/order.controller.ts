@@ -1,18 +1,8 @@
 import { Request, Response } from "express";
 import catchAsync from "../../utils/catchAsync";
 import * as orderService from "./order.service";
-import { checkoutSchema, updateOrderStatusSchema } from "./order.validator";
+import { updateOrderStatusSchema } from "./order.validator";
 
-export const checkoutController = catchAsync(async (req: Request, res: Response) => {
-  const data = checkoutSchema.parse(req.body);
-  const order = await orderService.checkout(req.user!.userId, data);
-
-  res.status(201).json({
-    success: true,
-    message: "Order placed successfully",
-    data: { order },
-  });
-});
 
 export const getMyOrdersController = catchAsync(async (req: Request, res: Response) => {
   const orders = await orderService.getMyOrders(req.user!.userId);
@@ -39,3 +29,4 @@ export const updateOrderStatusController = catchAsync(async (req: Request, res: 
   const order = await orderService.updateOrderStatus(req.user!.userId, req.params.id as string, data);
   res.status(200).json({ success: true, message: "Order status updated", data: { order } });
 });
+

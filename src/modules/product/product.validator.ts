@@ -26,6 +26,9 @@ export const listProductsSchema = z.object({
   minPrice: z.coerce.number().positive().optional(),
   maxPrice: z.coerce.number().positive().optional(),
   search: z.string().optional(),
+  featured: z.coerce.boolean().optional(),
+  tag: z.string().optional(),
+  sort: z.enum(["newest", "bestseller"]).optional(),
 });
 
 export type CreateProductInput = z.infer<typeof createProductSchema>;

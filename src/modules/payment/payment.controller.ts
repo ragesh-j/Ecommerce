@@ -1,13 +1,13 @@
 import { Request, Response } from "express";
 import catchAsync from "../../utils/catchAsync";
 import * as paymentService from "./payment.service";
-import { createPaymentSchema, verifyPaymentSchema } from "./payment.validator";
+import { initiatePaymentSchema, verifyPaymentSchema } from "./payment.validator";
 
-export const createPaymentController = catchAsync(async (req: Request, res: Response) => {
-  const data = createPaymentSchema.parse(req.body);
-  const result = await paymentService.createPayment(req.user!.userId, data);
+export const initiatePaymentController = catchAsync(async (req: Request, res: Response) => {
+  const data = initiatePaymentSchema.parse(req.body);
+  const result = await paymentService.initiatePayment(req.user!.userId, data);
 
-  res.status(201).json({
+  res.status(200).json({
     success: true,
     message: "Payment initiated",
     data: result,
@@ -21,6 +21,7 @@ export const verifyPaymentController = catchAsync(async (req: Request, res: Resp
   res.status(200).json({
     success: true,
     message: result.message,
+    data: { orderId: result.orderId },
   });
 });
 
@@ -33,7 +34,6 @@ export const getPaymentController = catchAsync(async (req: Request, res: Respons
   });
 });
 
-// webhook needs raw body for signature verification
 export const webhookController = async (req: Request, res: Response) => {
   try {
     const signature = req.headers["x-razorpay-signature"] as string;

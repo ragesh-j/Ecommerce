@@ -2,37 +2,43 @@ import crypto from "crypto";
 import prisma from "../../config/db";
 import razorpay from "../../config/razorpay";
 import { ApiError } from "../../utils/ApiError";
-import { CreatePaymentInput, VerifyPaymentInput } from "./payment.validator";
+import { InitiatePaymentInput, VerifyPaymentInput } from "./payment.validator";
 
-// ─── create razorpay order ────────────────────────────────────────────────────
-export const createPayment = async (userId: string, data: CreatePaymentInput) => {
-  const order = await prisma.order.findUnique({
-    where: { id: data.orderId },
-    include: { payment: true },
+// ─── initiate payment ─────────────────────────────────────────────────────────
+export const initiatePayment = async (userId: string, data: InitiatePaymentInput) => {
+  // get cart
+  const cart = await prisma.cart.findUnique({
+    where: { userId },
+    include: { items: { include: { variant: true } } },
   });
 
-  if (!order) throw new ApiError(404, "Order not found");
-  if (order.userId !== userId) throw new ApiError(403, "Forbidden");
-  if (order.status !== "PENDING") throw new ApiError(400, "Order is not pending");
-  if (order.payment) throw new ApiError(409, "Payment already initiated for this order");
+  if (!cart || cart.items.length === 0) throw new ApiError(400, "Cart is empty");
 
-  // create razorpay order (amount in paise → multiply by 100)
+  // verify address
+  const address = await prisma.address.findUnique({ where: { id: data.addressId } });
+  if (!address) throw new ApiError(404, "Address not found");
+  if (address.userId !== userId) throw new ApiError(403, "Forbidden");
+
+  // verify stock
+  for (const item of cart.items) {
+    if (item.variant.stock < item.quantity) {
+      throw new ApiError(400, `Not enough stock for ${item.variant.name}`);
+    }
+  }
+
+  // calculate total
+  const totalAmount = cart.items.reduce((sum, item) => {
+    return sum + Number(item.variant.price) * item.quantity;
+  }, 0);
+
+  // create razorpay order only — no DB order yet
   const razorpayOrder = await razorpay.orders.create({
-    amount: Math.round(Number(order.totalAmount) * 100),
+    amount: Math.round(totalAmount * 100),
     currency: "INR",
-    receipt: order.id,
-  });
-
-  // save pending payment to DB
-  const payment = await prisma.payment.create({
-    data: {
-      orderId: order.id,
+    receipt: `${userId}-${Date.now()}`,
+    notes: {
       userId,
-      amount: order.totalAmount,
-      currency: "INR",
-      provider: "razorpay",
-      status: "PENDING",
-      providerMetadata: { razorpayOrderId: razorpayOrder.id },
+      addressId: data.addressId,
     },
   });
 
@@ -40,23 +46,12 @@ export const createPayment = async (userId: string, data: CreatePaymentInput) =>
     razorpayOrderId: razorpayOrder.id,
     amount: razorpayOrder.amount,
     currency: razorpayOrder.currency,
-    paymentId: payment.id,
     keyId: process.env.RAZORPAY_KEY_ID,
   };
 };
 
-// ─── verify payment ───────────────────────────────────────────────────────────
+// ─── verify payment + create order ───────────────────────────────────────────
 export const verifyPayment = async (userId: string, data: VerifyPaymentInput) => {
-  const order = await prisma.order.findUnique({
-    where: { id: data.orderId },
-    include: { payment: true },
-  });
-
-  if (!order) throw new ApiError(404, "Order not found");
-  if (order.userId !== userId) throw new ApiError(403, "Forbidden");
-  if (!order.payment) throw new ApiError(404, "Payment not found");
-  if (order.payment.status === "COMPLETED") throw new ApiError(409, "Payment already completed");
-
   // verify signature
   const body = `${data.razorpayOrderId}|${data.razorpayPaymentId}`;
   const expectedSignature = crypto
@@ -68,11 +63,57 @@ export const verifyPayment = async (userId: string, data: VerifyPaymentInput) =>
     throw new ApiError(400, "Invalid payment signature");
   }
 
-  // update payment + order status in a transaction
-  await prisma.$transaction(async (tx) => {
-    await tx.payment.update({
-      where: { id: order.payment!.id },
+  // get cart
+  const cart = await prisma.cart.findUnique({
+    where: { userId },
+    include: { items: { include: { variant: true } } },
+  });
+
+  if (!cart || cart.items.length === 0) throw new ApiError(400, "Cart is empty");
+
+  // verify address
+  const address = await prisma.address.findUnique({ where: { id: data.addressId } });
+  if (!address) throw new ApiError(404, "Address not found");
+  if (address.userId !== userId) throw new ApiError(403, "Forbidden");
+
+  // verify stock again (might have changed)
+  for (const item of cart.items) {
+    if (item.variant.stock < item.quantity) {
+      throw new ApiError(400, `Not enough stock for ${item.variant.name}`);
+    }
+  }
+
+  const totalAmount = cart.items.reduce((sum, item) => {
+    return sum + Number(item.variant.price) * item.quantity;
+  }, 0);
+
+  // create order + payment + deduct stock + clear cart in one transaction
+  const order = await prisma.$transaction(async (tx) => {
+    // create order
+    const order = await tx.order.create({
       data: {
+        userId,
+        addressId: data.addressId,
+        totalAmount,
+        status: "PAID",
+        items: {
+          create: cart.items.map((item) => ({
+            variantId: item.variantId,
+            quantity: item.quantity,
+            unitPrice: item.variant.price,
+          })),
+        },
+      },
+    });
+
+    // create payment record
+    await tx.payment.create({
+      data: {
+        orderId: order.id,
+        userId,
+        amount: totalAmount,
+        currency: "INR",
+        provider: "razorpay",
         status: "COMPLETED",
         providerTxId: data.razorpayPaymentId,
         providerMetadata: {
@@ -83,13 +124,29 @@ export const verifyPayment = async (userId: string, data: VerifyPaymentInput) =>
       },
     });
 
-    await tx.order.update({
-      where: { id: data.orderId },
-      data: { status: "PAID" },
-    });
+    // deduct stock
+    for (const item of cart.items) {
+      await tx.productVariant.update({
+        where: { id: item.variantId },
+        data: { stock: { decrement: item.quantity } },
+      });
+    }
+
+    // increment salesCount
+    for (const item of cart.items) {
+      await tx.product.update({
+        where: { id: item.variant.productId },
+        data: { salesCount: { increment: item.quantity } },
+      });
+    }
+
+    // clear cart
+    await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
+
+    return order;
   });
 
-  return { success: true, message: "Payment verified successfully" };
+  return { success: true, message: "Payment verified successfully", orderId: order.id };
 };
 
 // ─── get payment by order id ──────────────────────────────────────────────────
@@ -106,7 +163,6 @@ export const getPaymentByOrderId = async (userId: string, orderId: string) => {
 
 // ─── webhook handler ──────────────────────────────────────────────────────────
 export const handleWebhook = async (body: string, signature: string) => {
-  // verify webhook signature
   const expectedSignature = crypto
     .createHmac("sha256", process.env.RAZORPAY_WEBHOOK_SECRET!)
     .update(body)
@@ -118,47 +174,85 @@ export const handleWebhook = async (body: string, signature: string) => {
 
   const event = JSON.parse(body);
 
+  // webhook is now just a safety net — verifyPayment handles the main flow
   switch (event.event) {
     case "payment.captured": {
       const razorpayPaymentId = event.payload.payment.entity.id;
       const razorpayOrderId = event.payload.payment.entity.order_id;
 
+      // check if payment already processed via verifyPayment
       const payment = await prisma.payment.findFirst({
-        where: {
-          providerMetadata: { path: ["razorpayOrderId"], equals: razorpayOrderId },
-        },
+        where: { providerTxId: razorpayPaymentId },
       });
 
-      if (payment && payment.status !== "COMPLETED") {
-        await prisma.$transaction(async (tx) => {
-          await tx.payment.update({
-            where: { id: payment.id },
-            data: { status: "COMPLETED", providerTxId: razorpayPaymentId },
-          });
-          await tx.order.update({
-            where: { id: payment.orderId },
-            data: { status: "PAID" },
-          });
+      // already handled by verifyPayment → skip
+      if (payment) break;
+
+      // fallback — if verifyPayment didn't fire (network issue etc)
+      // find the razorpay order notes to get userId and addressId
+      const razorpayOrderDetails = await razorpay.orders.fetch(razorpayOrderId);
+      const userId = razorpayOrderDetails.notes?.userId as string;
+      const addressId = razorpayOrderDetails.notes?.addressId as string;
+
+      if (!userId || !addressId) break;
+
+      // get cart and create order
+      const cart = await prisma.cart.findUnique({
+        where: { userId },
+        include: { items: { include: { variant: true } } },
+      });
+
+      if (!cart || cart.items.length === 0) break;
+
+      const totalAmount = cart.items.reduce((sum, item) => {
+        return sum + Number(item.variant.price) * item.quantity;
+      }, 0);
+
+      await prisma.$transaction(async (tx) => {
+        const order = await tx.order.create({
+          data: {
+            userId,
+            addressId,
+            totalAmount,
+            status: "PAID",
+            items: {
+              create: cart.items.map((item) => ({
+                variantId: item.variantId,
+                quantity: item.quantity,
+                unitPrice: item.variant.price,
+              })),
+            },
+          },
         });
-      }
+
+        await tx.payment.create({
+          data: {
+            orderId: order.id,
+            userId,
+            amount: totalAmount,
+            currency: "INR",
+            provider: "razorpay",
+            status: "COMPLETED",
+            providerTxId: razorpayPaymentId,
+            providerMetadata: { razorpayOrderId, razorpayPaymentId },
+          },
+        });
+
+        for (const item of cart.items) {
+          await tx.productVariant.update({
+            where: { id: item.variantId },
+            data: { stock: { decrement: item.quantity } },
+          });
+        }
+
+        await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
+      });
+
       break;
     }
 
     case "payment.failed": {
-      const razorpayOrderId = event.payload.payment.entity.order_id;
-
-      const payment = await prisma.payment.findFirst({
-        where: {
-          providerMetadata: { path: ["razorpayOrderId"], equals: razorpayOrderId },
-        },
-      });
-
-      if (payment) {
-        await prisma.payment.update({
-          where: { id: payment.id },
-          data: { status: "FAILED" },
-        });
-      }
+      // nothing to do — no order was created
       break;
     }
   }

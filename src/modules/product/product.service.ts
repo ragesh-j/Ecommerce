@@ -26,57 +26,77 @@ const getOwnProduct = async (productId: string, sellerId: string) => {
 
 // ─── list products (public) ───────────────────────────────────────────────────
 export const listProducts = async (query: ListProductsInput) => {
-  const { page, limit, categoryId, minPrice, maxPrice, search } = query;
+  const { page, limit, categoryId, minPrice, maxPrice, search, featured, tag, sort } = query; // ✅
   const skip = (page - 1) * limit;
 
   const where: any = {
     isPublished: true,
     ...(categoryId && { categoryId }),
+    ...(featured && { isFeatured: true }),                                  // ✅
+    ...(tag && { tags: { some: { tag: { slug: tag } } } }),                // ✅
     ...(search && { name: { contains: search, mode: "insensitive" } }),
-    ...(minPrice || maxPrice
-      ? {
-          variants: {
-            some: {
-              price: {
-                ...(minPrice && { gte: minPrice }),
-                ...(maxPrice && { lte: maxPrice }),
-              },
-            },
+    ...((minPrice || maxPrice) && {
+      variants: {
+        some: {
+          price: {
+            ...(minPrice && { gte: minPrice }),
+            ...(maxPrice && { lte: maxPrice }),
           },
-        }
-      : {}),
+        },
+      },
+    }),
   };
+
+  const orderBy: any =                                                      // ✅
+    sort === "bestseller" ? { salesCount: "desc" } :
+    sort === "newest"     ? { createdAt: "desc" } :
+                            { createdAt: "desc" };
 
   const [products, total] = await prisma.$transaction([
     prisma.product.findMany({
       where,
       skip,
       take: limit,
-      orderBy: { createdAt: "desc" },
+      orderBy,                                                              // ✅
       select: {
         id: true,
         name: true,
         slug: true,
         description: true,
+        isFeatured: true,                                                   // ✅
+        salesCount: true,                                                   // ✅
         createdAt: true,
         category: { select: { name: true, slug: true } },
         seller: { select: { id: true, storeName: true, logoUrl: true } },
+        tags: { select: { tag: { select: { name: true, slug: true } } } }, // ✅
         variants: {
           select: { price: true, stock: true },
           orderBy: { price: "asc" },
-          take: 1, // cheapest variant for listing
+          take: 1,
         },
         media: {
           select: { url: true },
-          take: 1, // first image as thumbnail
+          take: 1,
         },
+        reviews: { select: { rating: true } },                             // ✅
       },
     }),
     prisma.product.count({ where }),
   ]);
 
+  // ✅ compute avg rating
+  const formatted = products.map((p) => ({
+    ...p,
+    avgRating:
+      p.reviews.length > 0
+        ? p.reviews.reduce((sum, r) => sum + r.rating, 0) / p.reviews.length
+        : null,
+    reviewCount: p.reviews.length,
+    reviews: undefined,
+  }));
+
   return {
-    products,
+    products: formatted,
     pagination: {
       total,
       page,
@@ -231,17 +251,22 @@ export const uploadProductMedia = async (
     files.map(file => uploadToR2(file, "products"))
   );
 
-  const media = await prisma.media.createMany({
-    data: uploaded.map(({ url, key }, i) => ({
-      uploaderId: userId,
-      productId,
-      type: "IMAGE" as const,
-      url,
-      key,
-      mimeType: files[i].mimetype,
-      size: files[i].size,
-    })),
-  });
+const media = await Promise.all(
+  uploaded.map(({ url, key }, i) =>
+    prisma.media.create({
+      data: {
+        uploaderId: userId,
+        productId,
+        type: "IMAGE" as const,
+        url,
+        key,
+        mimeType: files[i].mimetype,
+        size: files[i].size,
+      },
+      select: { id: true, url: true, key: true },
+    })
+  )
+);
 
   return media;
 };
@@ -261,4 +286,30 @@ export const deleteProductMedia = async (
 
   await deleteFromR2(media.key);
   await prisma.media.delete({ where: { id: mediaId } });
+};
+
+// ─── toggle featured (admin) ──────────────────────────────────────────────────
+export const toggleFeatured = async (productId: string) => {
+  const product = await prisma.product.findUnique({ where: { id: productId } });
+  if (!product) throw new ApiError(404, "Product not found");
+
+  return prisma.product.update({
+    where: { id: productId },
+    data: { isFeatured: !product.isFeatured },
+  });
+};
+
+export const getMyProducts = async (userId: string) => {
+  const seller = await getSellerProfile(userId);
+  
+  return prisma.product.findMany({
+    where: { sellerId: seller.id },
+    include: {
+      category: { select: { name: true, slug: true } },
+      variants: { orderBy: { price: "asc" } },
+      media: { select: { id: true, url: true, key: true } },
+      _count: { select: { reviews: true } },
+    },
+    orderBy: { createdAt: "desc" },
+  });
 };

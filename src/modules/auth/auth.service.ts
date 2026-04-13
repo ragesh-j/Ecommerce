@@ -36,7 +36,7 @@ export const register = async (data: RegisterInput) => {
       name: data.name,
       email: data.email,
       passwordHash,
-      role: data.role,
+      role: 'BUYER',
     },
   });
 
@@ -83,7 +83,12 @@ export const refresh = async (refreshToken: string) => {
     },
   });
 
-  return { accessToken: newAccessToken };
+  return { accessToken: newAccessToken,user: {
+    userId: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+  } };
 };
 
 // ─── logout ───────────────────────────────────────────────────────────────────
@@ -110,5 +115,39 @@ export const exchangeOAuthCode = async (code: string, refreshToken: string) => {
   return {
     user: { id: user.id, name: user.name, email: user.email, role: user.role },
     accessToken: session.accessToken,
+  };
+};
+export const sellerRegister = async (data: { email: string; password: string; storeName: string; description?: string }) => {
+  const existing = await prisma.user.findUnique({ where: { email: data.email } });
+  if (existing) throw new ApiError(409, "Email already in use");
+
+  const passwordHash = await hashPassword(data.password);
+
+  const [user, sellerProfile] = await prisma.$transaction(async (tx) => {
+    const newUser = await tx.user.create({
+      data: {
+        email: data.email,
+        passwordHash,
+        role: "SELLER",
+      },
+    });
+
+    const profile = await tx.sellerProfile.create({
+      data: {
+        userId: newUser.id,
+        storeName: data.storeName,
+        description: data.description,
+      },
+    });
+
+    return [newUser, profile];
+  });
+
+  const tokens = await createSession(user.id, user.role);
+
+  return {
+    user: { userId: user.id, email: user.email, name: user.name, role: user.role },
+    sellerProfile,
+    ...tokens,
   };
 };

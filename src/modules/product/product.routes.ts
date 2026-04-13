@@ -14,12 +14,15 @@ import {
   deleteVariantController,
   uploadProductMediaController,
   deleteProductMediaController,
+  toggleFeaturedController,
+  getMyProductsController,
 } from "./product.controller";
 
 const router = Router();
 
 // ─── public routes ────────────────────────────────────────────────────────────
 router.get("/", listProductsController);
+router.get("/my", authenticate, authorize("SELLER"), getMyProductsController);
 router.get("/:slug", getProductBySlugController);
 
 // ─── seller only routes ───────────────────────────────────────────────────────
@@ -37,4 +40,5 @@ router.delete("/:id/variants/:vid", authenticate, authorize("SELLER"), deleteVar
 router.post("/:id/media", authenticate, authorize("SELLER"), upload.array("images", 5), uploadProductMediaController);
 router.delete("/:id/media/:mid", authenticate, authorize("SELLER"), deleteProductMediaController);
 
+router.patch("/:id/feature", authenticate, authorize("ADMIN"), toggleFeaturedController);
 export default router;

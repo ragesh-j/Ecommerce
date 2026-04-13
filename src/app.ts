@@ -19,7 +19,8 @@ import cartRoutes from './modules/cart/cart.routes';
 import orderRoutes from './modules/order/order.routes';
 import paymentRoutes from './modules/payment/payment.routes';
 import reviewRoutes from './modules/review/review.routes';
-
+import bannerRoutes from './modules/banner/banner.routes'
+import tagRoutes from "./modules/tag/tag.routes";
 import { generalLimiter, authLimiter } from './config/rateLimiter';
 
 const app = express();
@@ -28,9 +29,16 @@ const app = express();
 app.use(helmet());
 app.use(compression()); 
 app.use(cors({
-  origin: process.env.CLIENT_URL,
+    origin: [
+    process.env.FRONTEND_URL!,        // customer app
+    process.env.ADMIN_URL!,           // admin app
+    process.env.SELLER_URL!,          // seller app
+  ],
   credentials: true,
 }));
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
 app.use(generalLimiter); // ← apply to all routes
 
 // ─── Logging ──────────────────────────────────────────────────────────────────
@@ -61,6 +69,8 @@ app.use('/api/v1/products', productRoutes);
 app.use('/api/v1/cart', cartRoutes);
 app.use('/api/v1/orders', orderRoutes);
 app.use('/api/v1/reviews', reviewRoutes);
+app.use('/api/v1/banners', bannerRoutes);
+app.use('/api/v1/tags', tagRoutes);
 
 // ─── Error Handling ───────────────────────────────────────────────────────────
 app.use(notFound);

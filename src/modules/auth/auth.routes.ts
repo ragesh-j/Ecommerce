@@ -6,7 +6,8 @@ import {
   loginController,
   refreshController,
   logoutController,
-  exchangeController
+  exchangeController,
+  sellerRegisterController
 } from "./auth.controller";
 import { authLimiter } from "../../config/rateLimiter";
 
@@ -53,5 +54,7 @@ router.get(
 
 // ─── exchange code for accessToken ───────────────────────────────────────────
 router.post("/oauth/exchange", exchangeController);
+
+router.post("/seller/register", authLimiter, sellerRegisterController);
 
 export default router;

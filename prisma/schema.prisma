@@ -89,6 +89,8 @@ model Product {
   slug        String           @unique
   description String?
   isPublished Boolean          @default(false)
+  isFeatured  Boolean          @default(false)   // ✅ new
+  salesCount  Int              @default(0)        // ✅ new
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
   media       Media[]
@@ -96,10 +98,13 @@ model Product {
   seller      SellerProfile    @relation(fields: [sellerId], references: [id], onDelete: Cascade)
   variants    ProductVariant[]
   reviews     Review[]
+  tags        ProductTag[]  // ✅ new
 
   @@index([sellerId])
   @@index([categoryId])
   @@index([slug])
+  @@index([isFeatured])        // ✅ new
+  @@index([salesCount])        // ✅ new
 }
 
 model ProductVariant {
@@ -240,7 +245,33 @@ model Review {
   @@unique([productId, userId])
   @@index([productId])
 }
+model Banner {
+  id        String   @id @default(cuid())
+  imageUrl  String   @default("")
+  imageKey  String?
+  title     String
+  subtitle  String?
+  linkUrl   String?
+  isActive  Boolean  @default(true)
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+model Tag {
+  id       String       @id @default(cuid())
+  name     String       @unique  // "trending", "new", "hot", etc.
+  slug     String       @unique
+  products ProductTag[]
+}
 
+model ProductTag {
+  productId String
+  tagId     String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  tag       Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([productId, tagId])
+}
 enum Role {
   BUYER
   SELLER
@@ -254,6 +285,7 @@ enum OrderStatus {
   DELIVERED
   CANCELLED
   REFUNDED
+  FAILED
 }
 
 enum PaymentStatus {

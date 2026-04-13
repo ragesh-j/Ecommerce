@@ -1,79 +1,8 @@
 import prisma from "../../config/db";
 import { ApiError } from "../../utils/ApiError";
-import { CheckoutInput, UpdateOrderStatusInput } from "./order.validator";
+import {  UpdateOrderStatusInput } from "./order.validator";
 
-// ─── checkout ─────────────────────────────────────────────────────────────────
-export const checkout = async (userId: string, data: CheckoutInput) => {
-  // get cart with items
-  const cart = await prisma.cart.findUnique({
-    where: { userId },
-    include: {
-      items: {
-        include: {
-          variant: true,
-        },
-      },
-    },
-  });
 
-  if (!cart || cart.items.length === 0) throw new ApiError(400, "Cart is empty");
-
-  // verify address belongs to user
-  const address = await prisma.address.findUnique({ where: { id: data.addressId } });
-  if (!address) throw new ApiError(404, "Address not found");
-  if (address.userId !== userId) throw new ApiError(403, "Forbidden");
-
-  // verify stock for all items
-  for (const item of cart.items) {
-    if (item.variant.stock < item.quantity) {
-      throw new ApiError(400, `Not enough stock for ${item.variant.name}`);
-    }
-  }
-
-  // calculate total
-  const totalAmount = cart.items.reduce((sum, item) => {
-    return sum + Number(item.variant.price) * item.quantity;
-  }, 0);
-
-  // create order + order items + deduct stock in a transaction
-  const order = await prisma.$transaction(async (tx) => {
-    // create order
-    const order = await tx.order.create({
-      data: {
-        userId,
-        addressId: data.addressId,
-        totalAmount,
-        status: "PENDING",
-        items: {
-          create: cart.items.map((item) => ({
-            variantId: item.variantId,
-            quantity: item.quantity,
-            unitPrice: item.variant.price,
-          })),
-        },
-      },
-      include: {
-        items: true,
-        address: true,
-      },
-    });
-
-    // deduct stock for each variant
-    for (const item of cart.items) {
-      await tx.productVariant.update({
-        where: { id: item.variantId },
-        data: { stock: { decrement: item.quantity } },
-      });
-    }
-
-    // clear cart
-    await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
-
-    return order;
-  });
-
-  return order;
-};
 
 // ─── get my orders ────────────────────────────────────────────────────────────
 export const getMyOrders = async (userId: string) => {
@@ -88,7 +17,7 @@ export const getMyOrders = async (userId: string) => {
             select: {
               name: true,
               sku: true,
-              product: { select: { name: true, slug: true } },
+              product: { select: {id: true, name: true, slug: true } },
             },
           },
         },
@@ -132,10 +61,10 @@ export const cancelOrder = async (userId: string, orderId: string) => {
 
   if (!order) throw new ApiError(404, "Order not found");
   if (order.userId !== userId) throw new ApiError(403, "Forbidden");
-  if (order.status !== "PENDING") throw new ApiError(400, "Only pending orders can be cancelled");
+  if (order.status !== "PAID") throw new ApiError(400, "Only paid orders can be cancelled");
 
-  // restore stock + update status in a transaction
   return prisma.$transaction(async (tx) => {
+    // restore stock
     for (const item of order.items) {
       await tx.productVariant.update({
         where: { id: item.variantId },
@@ -220,7 +149,6 @@ export const updateOrderStatus = async (
 
   // status transition rules
   const validTransitions: Record<string, string[]> = {
-    PENDING: ["CANCELLED"],
     PAID: ["SHIPPED", "CANCELLED"],
     SHIPPED: ["DELIVERED"],
   };

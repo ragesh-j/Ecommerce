@@ -95,3 +95,16 @@ export const deleteProductMediaController = catchAsync(async (req: Request, res:
   );
   res.status(200).json({ success: true, message: "Media deleted" });
 });
+export const toggleFeaturedController = catchAsync(async (req: Request, res: Response) => {
+  const product = await productService.toggleFeatured(req.params.id as string);
+
+  res.status(200).json({
+    success: true,
+    message: product.isFeatured ? "Product marked as featured" : "Product removed from featured",
+    data: { product },
+  });
+});
+export const getMyProductsController = catchAsync(async (req: Request, res: Response) => {
+  const products = await productService.getMyProducts(req.user!.userId);
+  res.status(200).json({ success: true, data: { products } });
+});

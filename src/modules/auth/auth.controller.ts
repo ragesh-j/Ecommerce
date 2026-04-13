@@ -3,7 +3,7 @@ import { Request, Response } from "express";
 import catchAsync from "../../utils/catchAsync";
 import { ApiError } from "../../utils/ApiError";
 import * as authService from "./auth.service";
-import { registerSchema, loginSchema } from "./auth.validator";
+import { registerSchema, loginSchema,sellerRegisterSchema } from "./auth.validator";
 
 const REFRESH_COOKIE_OPTIONS = {
   httpOnly: true,
@@ -45,7 +45,10 @@ export const refreshController = catchAsync(async (req: Request, res: Response) 
   const result = await authService.refresh(refreshToken);
   res.status(200).json({
     success: true,
-    data: { accessToken: result.accessToken },
+    data: { 
+      accessToken: result.accessToken,
+      user: result.user,
+    },
   });
 });
 
@@ -74,5 +77,20 @@ export const exchangeController = catchAsync(async (req: Request, res: Response)
   res.status(200).json({
     success: true,
     data: { user: result.user, accessToken: result.accessToken },
+  });
+});
+export const sellerRegisterController = catchAsync(async (req: Request, res: Response) => {
+  const data = sellerRegisterSchema.parse(req.body);
+  const result = await authService.sellerRegister(data);
+
+  res.cookie("refreshToken", result.refreshToken, REFRESH_COOKIE_OPTIONS);
+  res.status(201).json({
+    success: true,
+    message: "Seller account created successfully",
+    data: { 
+      user: result.user, 
+      accessToken: result.accessToken,
+      sellerProfile: result.sellerProfile,
+    },
   });
 });
