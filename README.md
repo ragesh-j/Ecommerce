@@ -112,54 +112,125 @@ npm start
 
 ### Auth
 ```
-POST   /api/v1/auth/register           → Register as buyer
-POST   /api/v1/auth/seller/register    → Register as seller
-POST   /api/v1/auth/login              → Login
-POST   /api/v1/auth/refresh            → Refresh access token
-POST   /api/v1/auth/logout             → Logout
-GET    /api/v1/auth/google             → Google OAuth
-GET    /api/v1/auth/google/callback    → Google OAuth callback
-POST   /api/v1/auth/oauth/exchange     → Exchange OAuth code
+POST   /api/v1/auth/register                → Register as buyer
+POST   /api/v1/auth/seller/register         → Register as seller
+POST   /api/v1/auth/login                   → Login
+POST   /api/v1/auth/refresh                 → Refresh access token
+POST   /api/v1/auth/logout                  → Logout
+GET    /api/v1/auth/google                  → Google OAuth
+GET    /api/v1/auth/google/callback         → Google OAuth callback
+POST   /api/v1/auth/oauth/exchange          → Exchange OAuth code for token
+```
+
+### Users
+```
+GET    /api/v1/users/me                     → Get profile
+PUT    /api/v1/users/me                     → Update profile
+PUT    /api/v1/users/me/password            → Change password
+POST   /api/v1/users/me/password            → Set password (Google users)
+GET    /api/v1/users/me/addresses           → Get addresses
+POST   /api/v1/users/me/addresses           → Add address
+PUT    /api/v1/users/me/addresses/:id       → Update address
+DELETE /api/v1/users/me/addresses/:id       → Delete address
+GET    /api/v1/users/me/orders              → Get my orders
+GET    /api/v1/users/me/reviews             → Get my reviews
+```
+
+### Sellers
+```
+POST   /api/v1/sellers/profile              → Create seller profile
+GET    /api/v1/sellers/profile              → Get my seller profile (SELLER)
+PUT    /api/v1/sellers/profile              → Update seller profile (SELLER)
+GET    /api/v1/sellers/:id                  → Get public seller profile
+```
+
+### Categories
+```
+GET    /api/v1/categories                   → List all categories (public)
+GET    /api/v1/categories/:slug             → Get category by slug (public)
+POST   /api/v1/categories                   → Create category (ADMIN)
+PUT    /api/v1/categories/:id               → Update category (ADMIN)
+DELETE /api/v1/categories/:id               → Delete category (ADMIN)
+```
+
+### Tags
+```
+GET    /api/v1/tags                                         → List all tags (public)
+POST   /api/v1/tags                                         → Create tag (ADMIN)
+PUT    /api/v1/tags/:id                                     → Update tag (ADMIN)
+DELETE /api/v1/tags/:id                                     → Delete tag (ADMIN)
+POST   /api/v1/tags/products/:productId/tags/:tagId         → Assign tag to product (ADMIN)
+DELETE /api/v1/tags/products/:productId/tags/:tagId         → Remove tag from product (ADMIN)
 ```
 
 ### Products
 ```
-GET    /api/v1/products                → List products (public)
-GET    /api/v1/products/my             → Seller's own products
-GET    /api/v1/products/:slug          → Get product by slug
-POST   /api/v1/products                → Create product (SELLER)
-PUT    /api/v1/products/:id            → Update product (SELLER)
-DELETE /api/v1/products/:id            → Delete product (SELLER)
-PATCH  /api/v1/products/:id/publish    → Toggle publish (SELLER)
-PATCH  /api/v1/products/:id/feature    → Toggle featured (ADMIN)
+GET    /api/v1/products                     → List products (public)
+GET    /api/v1/products/my                  → Seller's own products (SELLER)
+GET    /api/v1/products/:slug               → Get product by slug (public)
+POST   /api/v1/products                     → Create product (SELLER)
+PUT    /api/v1/products/:id                 → Update product (SELLER)
+DELETE /api/v1/products/:id                 → Delete product (SELLER)
+PATCH  /api/v1/products/:id/publish         → Toggle publish (SELLER)
+PATCH  /api/v1/products/:id/feature         → Toggle featured (ADMIN)
+```
+
+### Product Variants
+```
+POST   /api/v1/products/:id/variants        → Add variant (SELLER)
+PUT    /api/v1/products/:id/variants/:vid   → Update variant (SELLER)
+DELETE /api/v1/products/:id/variants/:vid   → Delete variant (SELLER)
+```
+
+### Product Media
+```
+POST   /api/v1/products/:id/media           → Upload images (SELLER)
+DELETE /api/v1/products/:id/media/:mid      → Delete image (SELLER)
+```
+
+### Cart
+```
+GET    /api/v1/cart                         → Get cart
+POST   /api/v1/cart/items                   → Add item to cart
+PUT    /api/v1/cart/items/:id               → Update item quantity
+DELETE /api/v1/cart/items/:id               → Remove item from cart
+DELETE /api/v1/cart                         → Clear cart
 ```
 
 ### Orders
 ```
-GET    /api/v1/orders                  → Get my orders (BUYER)
-GET    /api/v1/orders/:id              → Get order by id
-PATCH  /api/v1/orders/:id/cancel       → Cancel order (BUYER)
-GET    /api/v1/orders/seller/list      → Seller orders (SELLER)
-PATCH  /api/v1/orders/:id/status       → Update status (SELLER)
+GET    /api/v1/orders                       → Get my orders (BUYER)
+GET    /api/v1/orders/:id                   → Get order by id
+PATCH  /api/v1/orders/:id/cancel            → Cancel order (BUYER)
+GET    /api/v1/orders/seller/list           → Seller orders (SELLER)
+PATCH  /api/v1/orders/:id/status            → Update order status (SELLER)
 ```
 
 ### Payments
 ```
-POST   /api/v1/payments/initiate       → Initiate Razorpay payment
-POST   /api/v1/payments/verify         → Verify payment + create order
-POST   /api/v1/payments/webhook        → Razorpay webhook
-GET    /api/v1/payments/:orderId       → Get payment
+POST   /api/v1/payments/initiate            → Initiate Razorpay payment
+POST   /api/v1/payments/verify              → Verify payment + create order
+POST   /api/v1/payments/webhook             → Razorpay webhook (safety net)
+GET    /api/v1/payments/:orderId            → Get payment by order id
+```
+
+### Reviews
+```
+GET    /api/v1/reviews/products/:productId  → Get product reviews (public)
+POST   /api/v1/reviews/products/:productId  → Create review (verified purchase)
+PUT    /api/v1/reviews/:id                  → Update review
+DELETE /api/v1/reviews/:id                  → Delete review
 ```
 
 ### Banners
 ```
-GET    /api/v1/banners                 → Active banners (public)
-GET    /api/v1/banners/all             → All banners (ADMIN)
-POST   /api/v1/banners                 → Create banner (ADMIN)
-PUT    /api/v1/banners/:id             → Update banner (ADMIN)
-POST   /api/v1/banners/:id/image       → Upload image (ADMIN)
-PATCH  /api/v1/banners/:id/toggle      → Toggle active (ADMIN)
-DELETE /api/v1/banners/:id             → Delete banner (ADMIN)
+GET    /api/v1/banners                      → Active banners (public)
+GET    /api/v1/banners/all                  → All banners (ADMIN)
+POST   /api/v1/banners                      → Create banner (ADMIN)
+PUT    /api/v1/banners/:id                  → Update banner (ADMIN)
+POST   /api/v1/banners/:id/image            → Upload banner image (ADMIN)
+PATCH  /api/v1/banners/:id/toggle           → Toggle active (ADMIN)
+DELETE /api/v1/banners/:id                  → Delete banner (ADMIN)
 ```
 
 ## Payment Flow
@@ -175,13 +246,14 @@ DELETE /api/v1/banners/:id             → Delete banner (ADMIN)
 3. POST /payments/verify
    → Verifies Razorpay signature
    → Creates order in DB (status: PAID)
-   → Creates payment record
+   → Creates payment record (status: COMPLETED)
    → Deducts stock
    → Clears cart
-   → All in one transaction
+   → All in one transaction ✅
 
 4. Webhook (safety net)
-   → Handles edge cases where verify didn't fire
+   → Handles edge cases where verify didn't fire (network issues)
+   → Checks if order already created before creating again
 ```
 
 ## Project Structure
@@ -192,7 +264,7 @@ src/
 ├── middlewares/      # Auth, error handler, not found
 ├── modules/
 │   ├── auth/         # Login, register, OAuth
-│   ├── user/         # Profile, addresses
+│   ├── user/         # Profile, addresses, reviews
 │   ├── seller/       # Seller profile
 │   ├── product/      # Products, variants, media
 │   ├── category/     # Categories
